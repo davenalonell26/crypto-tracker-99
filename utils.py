@@ -1,35 +1,53 @@
-import time
-import requests
-from requests.exceptions import RequestException
+import datetime
+from typing import List, Dict, Any
 
-def retry_request(url, max_retries=5, backoff_factor=0.3):
-    """
-    Makes an HTTP GET request to the specified URL with retry logic.
-    :param url: The URL to fetch.
-    :param max_retries: Maximum number of retries allowed.
-    :param backoff_factor: Factor by which to increase the wait time between retrials.
-    :return: The response object if successful; else None.
-    """
-    for attempt in range(max_retries):
-        try:
-            response = requests.get(url)
-            response.raise_for_status()
-            return response
-        except RequestException as e:
-            print(f'Attempt {attempt + 1} failed: {e}')
-            if attempt < max_retries - 1:
-                time.sleep(backoff_factor * (2 ** attempt))
-            else:
-                print('Max retries reached. Exiting.')
-                return None
-    
-def example_usage():
-    url = 'https://api.example.com/data'
-    response = retry_request(url)
-    if response:
-        print('Response received:', response.json())
-    else:
-        print('Failed to retrieve data.')
+def calculate_total_value(holdings: List[Dict[str, Any]], current_prices: Dict[str, float]) -> float:
+    total = 0.0
+    for holding in holdings:
+        symbol = holding.get("symbol", "").upper()
+        amount = holding.get("amount", 0.0)
+        if symbol in current_prices:
+            total += amount * current_prices[symbol]
+    return total
 
-if __name__ == '__main__':
-    example_usage()
+def get_percentage_change(previous_price: float, current_price: float) -> float:
+    if previous_price == 0:
+        return 0.0
+    change = ((current_price - previous_price) / previous_price) * 100
+    return round(change, 2)
+
+def format_price(price: float, symbol: str = "USD") -> str:
+    if symbol == "USD":
+        return f"${price:,.2f}"
+    return f"{price:,.2f} {symbol}"
+
+def is_valid_crypto_symbol(symbol: str) -> bool:
+    if not isinstance(symbol, str):
+        return False
+    symbol = symbol.strip().upper()
+    return len(symbol) >= 2 and len(symbol) <= 10 and symbol.isalpha()
+
+def convert_timestamp_to_date(timestamp: int) -> str:
+    dt = datetime.datetime.fromtimestamp(timestamp)
+    return dt.strftime("%Y-%m-%d %H:%M:%S")
+
+def filter_holdings_by_symbol(holdings: List[Dict[str, Any]], symbol: str) -> List[Dict[str, Any]]:
+    symbol = symbol.upper()
+    return [h for h in holdings if h.get("symbol", "").upper() == symbol]
+
+def calculate_average_price(prices: List[float]) -> float:
+    if not prices:
+        return 0.0
+    return sum(prices) / len(prices)
+
+def get_top_performers(holdings: List[Dict[str, Any]], prices: Dict[str, float], n: int = 3) -> List[str]:
+    if not holdings or not prices:
+        return []
+    values = []
+    for h in holdings:
+        sym = h.get("symbol", "").upper()
+        amt = h.get("amount", 0)
+        if sym in prices:
+            values.append((sym, amt * prices[sym]))
+    values.sort(key=lambda x: x[1], reverse=True)
+    return [v[0] for v in values[:n]]
