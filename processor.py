@@ -1,76 +1,44 @@
-from typing import List, Dict, Optional
-from dataclasses import dataclass
+import json
+from typing import Dict, List, Optional
 
-@dataclass
-class CryptoPrice:
-    """Represents cryptocurrency price data."""
-    symbol: str
-    price: float
-    timestamp: int
+def calculate_percentage_change(previous: float, current: float) -> float:
+    """Calculate the percentage change from previous to current price."""
+    if previous == 0:
+        return 0.0
+    change = ((current - previous) / previous) * 100
+    return round(change, 2)
 
-def process_price_changes(prices: List[CryptoPrice], min_change: float = 0.01) -> Dict[str, float]:
-    """Calculate significant price changes per symbol.
+def format_crypto_value(value: float, symbol: str = "USD") -> str:
+    """Format the value with currency symbol for display."""
+    if symbol == "USD":
+        return f"${value:,.2f}"
+    elif symbol == "EUR":
+        return f"€{value:,.2f}"
+    else:
+        return f"{value:.6f} {symbol}"
 
-    Args:
-        prices: List of price records.
-        min_change: Minimum change ratio to report.
+def compute_total_value(holdings: Dict[str, float], prices: Dict[str, float]) -> float:
+    """Calculate the total portfolio value in base currency."""
+    total = 0.0
+    for crypto, amount in holdings.items():
+        price = prices.get(crypto, 0.0)
+        total += amount * price
+    return round(total, 2)
 
-    Returns:
-        Symbol to change ratio dict.
-    """
-    if not prices:
-        return {}
-
-    grouped: Dict[str, List[CryptoPrice]] = {}
-    for p in prices:
-        grouped.setdefault(p.symbol, []).append(p)
-
-    changes: Dict[str, float] = {}
-    for symbol, lst in grouped.items():
-        if len(lst) < 2:
-            continue
-        srt = sorted(lst, key=lambda x: x.timestamp)
-        chg = (srt[-1].price - srt[0].price) / srt[0].price
-        if abs(chg) >= min_change:
-            changes[symbol] = round(chg, 4)
-    return changes
-
-def get_average(prices: List[CryptoPrice]) -> float:
-    """Return average price or zero if none."""
+def get_average_price(prices: List[float]) -> float:
+    """Compute average price from list of prices."""
     if not prices:
         return 0.0
-    return sum(p.price for p in prices) / len(prices)
+    return round(sum(prices) / len(prices), 2)
 
-class CryptoProcessor:
-    """Handles processing of crypto price lists."""
-    def __init__(self, prices: Optional[List[CryptoPrice]] = None) -> None:
-        """Set up with initial prices if provided."""
-        self.prices: List[CryptoPrice] = prices or []
+def filter_by_change(percentage_changes: Dict[str, float], min_change: float = 1.0) -> Dict[str, float]:
+    """Filter entries with absolute change above minimum."""
+    return {k: v for k, v in percentage_changes.items() if abs(v) >= min_change}
 
-    def add_price(self, price: CryptoPrice) -> None:
-        """Append a price to the internal list."""
-        self.prices.append(price)
-
-    def get_changes(self, threshold: float = 0.05) -> Dict[str, float]:
-        """Return changes above the given threshold."""
-        return process_price_changes(self.prices, threshold)
-
-    def get_stats(self) -> Dict[str, float]:
-        """Provide count, avg, min and max stats."""
-        if not self.prices:
-            return {"count": 0, "avg": 0.0, "min": 0.0, "max": 0.0}
-
-        vals = [p.price for p in self.prices]
-        avg = get_average(self.prices)
-        return {
-            "count": len(self.prices),
-            "avg": round(avg, 2),
-            "min": min(vals),
-            "max": max(vals)
-        }
-
-if __name__ == "__main__":
-    prices = [CryptoPrice("BTC", 50000.0, 100), CryptoPrice("BTC", 51000.0, 200)]
-    cp = CryptoProcessor(prices)
-    print(cp.get_stats())
-    print(cp.get_changes(0.01))
+def parse_price_json(json_str: str) -> Optional[Dict[str, float]]:
+    """Parse JSON string into crypto prices dictionary."""
+    try:
+        data = json.loads(json_str)
+        return {str(k): float(v) for k, v in data.items() if isinstance(v, (int, float))}
+    except (json.JSONDecodeError, ValueError, TypeError):
+        return None
