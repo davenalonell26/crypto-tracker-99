@@ -1,24 +1,30 @@
 import re
-from typing import Optional
 
-class CryptoValidator:
-    def __init__(self):
-        # Precompiled regex patterns for performance
-        self.address_pattern = re.compile(r'^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$')
-        self.txid_pattern = re.compile(r'^[a-fA-F0-9]{64}$')
+# Standard regular expressions for crypto address patterns
+BTC_ADDRESS_RE = re.compile(r'^(1[a-km-zA-HJ-NP-Z1-9]{25,34}|3[a-km-zA-HJ-NP-Z1-9]{25,34}|bc1[ac-hj-np-z02-9]{11,71})$')
+ETH_ADDRESS_RE = re.compile(r'^0x[a-fA-F0-9]{40}$')
+TX_HASH_RE = re.compile(r'^(0x)?[a-fA-F0-9]{64}$')
 
-    def is_valid_address(self, address: str) -> bool:
-        """Validates a Bitcoin address."""
-        return bool(self.address_pattern.match(address))
+def validate_symbol(symbol: str) -> bool:
+    """Validate if the cryptocurrency symbol is in a standard ticker format."""
+    if not symbol or not isinstance(symbol, str):
+        return False
+    return bool(re.match(r'^[A-Z0-9]{2,10}$', symbol.upper()))
 
-    def is_valid_txid(self, txid: str) -> bool:
-        """Validates a Bitcoin transaction ID."""
-        return bool(self.txid_pattern.match(txid))
+def validate_btc_address(address: str) -> bool:
+    """Validate standard Bitcoin address formats (P2PKH, P2SH, Bech32)."""
+    if not address or not isinstance(address, str):
+        return False
+    return bool(BTC_ADDRESS_RE.match(address))
 
-    def validate(self, address: Optional[str] = None, txid: Optional[str] = None) -> bool:
-        """Validates both address and transaction ID if provided."""
-        if address and not self.is_valid_address(address):
-            raise ValueError(f'Invalid Bitcoin address: {address}')
-        if txid and not self.is_valid_txid(txid):
-            raise ValueError(f'Invalid transaction ID: {txid}')
-        return True
+def validate_eth_address(address: str) -> bool:
+    """Validate standard Ethereum address format."""
+    if not address or not isinstance(address, str):
+        return False
+    return bool(ETH_ADDRESS_RE.match(address))
+
+def validate_tx_hash(tx_hash: str) -> bool:
+    """Validate common 64-character hex transaction hashes."""
+    if not tx_hash or not isinstance(tx_hash, str):
+        return False
+    return bool(TX_HASH_RE.match(tx_hash))
