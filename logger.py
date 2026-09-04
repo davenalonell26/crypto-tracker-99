@@ -1,31 +1,34 @@
 import logging
+import os
 import sys
-from logging.handlers import RotatingFileHandler
 
-def get_logger(name: str) -> logging.Logger:
-    """Configures a standard logger for crypto-tracker-99"""
+def setup_logger(name: str = "crypto_tracker", log_file: str = "tracker.log", level: int = logging.INFO) -> logging.Logger:
     logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
+    logger.setLevel(level)
+    
+    if logger.hasHandlers():
+        return logger
 
     formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        fmt="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S"
     )
 
-    # Console handler for development visibility
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
 
-    # File handler for tracking historical operation logs
-    file_handler = RotatingFileHandler(
-        'crypto_tracker.log', 
-        maxBytes=1048576, 
-        backupCount=3
-    )
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
+    try:
+        log_dir = os.path.dirname(log_file)
+        if log_dir and not os.path.exists(log_dir):
+            os.makedirs(log_dir, exist_ok=True)
+        
+        file_handler = logging.FileHandler(log_file, encoding="utf-8")
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+    except Exception as e:
+        logger.warning(f"Failed to set up file handler: {e}")
 
     return logger
 
-# Instance for global application usage
-app_logger = get_logger('crypto-tracker-99')
+logger = setup_logger()
