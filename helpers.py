@@ -1,30 +1,51 @@
-from typing import Dict, Any, Optional
+from typing import Dict, List, Optional
 
-def format_crypto_amount(amount: float, symbol: str, decimals: int = 4) -> str:
-    """Format cryptocurrency amount with appropriate decimal precision and symbol."""
-    if amount is None:
-        return f"0.0000 {symbol}"
-    
-    format_string = f"{{:.{decimals}f}}"
-    formatted_number = format_string.format(amount)
-    return f"{formatted_number} {symbol.upper()}"
 
-def calculate_price_change(current_price: float, previous_price: float) -> Optional[Dict[str, Any]]:
-    """Calculate absolute and percentage price change between two data points."""
-    if not previous_price or previous_price == 0:
-        return None
-        
-    price_difference = current_price - previous_price
-    percentage_change = (price_difference / previous_price) * 100
-    
-    return {
-        "absolute_change": round(price_difference, 8),
-        "percentage_change": round(percentage_change, 2),
-        "is_positive": price_difference >= 0
-    }
+def calculate_portfolio_value(prices: Dict[str, float], holdings: Dict[str, float]) -> float:
+    """Calculate the total fiat value of a crypto portfolio based on current market prices.
 
-def sanitize_ticker(ticker: str) -> str:
-    """Clean and normalize cryptocurrency ticker symbols."""
-    if not ticker:
-        return ""
-    return ticker.strip().upper().replace("/", "-")
+    Args:
+        prices: Dictionary mapping crypto symbols to current prices in USD.
+        holdings: Dictionary mapping crypto symbols to amount held.
+
+    Returns:
+        Total portfolio value in USD.
+    """
+    total = 0.0
+    for symbol, amount in holdings.items():
+        price = prices.get(symbol, 0.0)
+        total += price * amount
+    return total
+
+
+def format_currency(value: float, currency_symbol: str = "$") -> str:
+    """Format a numeric value as a currency string with appropriate decimals.
+
+    Args:
+        value: The numerical amount to format.
+        currency_symbol: Prefix symbol for currency representation.
+
+    Returns:
+        Formatted currency string.
+    """
+    if 0 < value < 0.01:
+        return f"{currency_symbol}{value:.6f}"
+    return f"{currency_symbol}{value:,.2f}"
+
+
+def filter_top_gainers(market_data: List[Dict[str, float]], limit: int = 5) -> List[Dict[str, float]]:
+    """Sort and filter market data entries to return the top gaining cryptocurrencies.
+
+    Args:
+        market_data: List of dictionaries containing coin data including 'change_24h'.
+        limit: Maximum number of top gainers to return.
+
+    Returns:
+        Sorted list of top gaining coin records.
+    """
+    sorted_coins = sorted(
+        market_data,
+        key=lambda coin: coin.get("change_24h", 0.0),
+        reverse=True
+    )
+    return sorted_coins[:limit]
