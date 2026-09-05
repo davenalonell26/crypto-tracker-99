@@ -1,60 +1,25 @@
-"""Custom exceptions for crypto-tracker-99.
-
-This module centralizes exception definitions for better organization after cleanup.
-"""
+from typing import Optional
 
 class CryptoTrackerError(Exception):
-    """Base class for all crypto tracker exceptions."""
-    pass
-
-
-class APIError(CryptoTrackerError):
-    """Exception raised for errors during API interactions."""
-
-    def __init__(self, message, status_code=None):
+    """Base exception for the crypto-tracker-99 application."""
+    def __init__(self, message: str, code: Optional[int] = None) -> None:
         super().__init__(message)
-        self.status_code = status_code
+        self.code = code
 
-    def __str__(self):
-        base = super().__str__()
-        if self.status_code:
-            return f"{base} (HTTP {self.status_code})"
-        return base
-
-
-class InvalidCoinError(CryptoTrackerError):
-    """Exception raised for invalid cryptocurrency identifiers."""
+class APIConnectionError(CryptoTrackerError):
+    """Raised when the crypto exchange API is unreachable."""
     pass
 
-
-class RateLimitError(APIError):
-    """Exception raised when rate limit is hit."""
+class DataValidationError(CryptoTrackerError):
+    """Raised when incoming market data fails schema validation."""
     pass
 
+class RateLimitExceeded(CryptoTrackerError):
+    """Raised when API request limits are reached."""
+    def __init__(self, message: str = "API rate limit exceeded", retry_after: int = 60) -> None:
+        super().__init__(message, code=429)
+        self.retry_after = retry_after
 
-class AuthError(APIError):
-    """Exception raised on authentication failure."""
+class ConfigurationError(CryptoTrackerError):
+    """Raised when environment or config settings are missing."""
     pass
-
-
-class ParseError(CryptoTrackerError):
-    """Exception raised on data parsing failure."""
-    pass
-
-
-class NetworkError(CryptoTrackerError):
-    """Exception raised on network issues."""
-    pass
-
-
-def create_api_error(status_code, message="Request failed"):
-    """Factory function to create appropriate API error."""
-    if status_code == 429:
-        return RateLimitError(message, status_code)
-    if status_code in (401, 403):
-        return AuthError(message, status_code)
-    if 400 <= status_code < 500:
-        return APIError(message, status_code)
-    if 500 <= status_code < 600:
-        return APIError(message, status_code)
-    return APIError(message, status_code)
