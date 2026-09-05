@@ -1,52 +1,36 @@
-import logging
-from typing import Dict, Any, List
+from typing import Dict, List, Optional
+import requests
 
-logger = logging.getLogger(__name__)
+class CryptoTracker:
+    """Main service for tracking cryptocurrency market data."""
 
-class CryptoDataProcessor:
-    """Processes and validates incoming cryptocurrency tick data."""
-    
-    def __init__(self, allowed_symbols: List[str]):
-        self.allowed_symbols = {sym.upper() for sym in allowed_symbols}
+    def __init__(self, api_url: str, timeout: int = 10) -> None:
+        self.api_url = api_url
+        self.timeout = timeout
 
-    def validate_payload(self, data: Dict[str, Any]) -> bool:
-        """Validates the structure and values of the crypto data payload."""
-        if not isinstance(data, dict):
-            logger.error("Payload is not a dictionary.")
-            return False
-            
-        required_fields = ["symbol", "price", "volume", "timestamp"]
-        for field in required_fields:
-            if field not in data:
-                logger.error(f"Missing required field: {field}")
-                return False
-
-        symbol = data["symbol"]
-        if not isinstance(symbol, str) or symbol.upper() not in self.allowed_symbols:
-            logger.error(f"Invalid or unsupported symbol: {symbol}")
-            return False
-
+    def fetch_price(self, symbol: str) -> Optional[float]:
+        """Retrieve current price for a specific ticker symbol."""
         try:
-            price = float(data["price"])
-            volume = float(data["volume"])
-            if price <= 0 or volume < 0:
-                logger.error(f"Invalid numeric values: price={price}, volume={volume}")
-                return False
-        except (ValueError, TypeError):
-            logger.error("Price and volume must be numeric values.")
-            return False
+            response = requests.get(f"{self.api_url}/price/{symbol}", timeout=self.timeout)
+            response.raise_for_status()
+            data: Dict[str, float] = response.json()
+            return data.get("price")
+        except (requests.RequestException, ValueError):
+            return None
 
-        return True
+    def get_portfolio_value(self, holdings: Dict[str, float]) -> float:
+        """Calculate total market value of all held assets."""
+        total: float = 0.0
+        for symbol, amount in holdings.items():
+            price = self.fetch_price(symbol)
+            if price:
+                total += price * amount
+        return total
 
-    def process_queue(self, queue: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Processes a queue of raw crypto payloads, filtering out invalid ones."""
-        validated_data = []
-        for index, payload in enumerate(queue):
-            if self.validate_payload(payload):
-                payload["symbol"] = payload["symbol"].upper()
-                payload["price"] = float(payload["price"])
-                payload["volume"] = float(payload["volume"])
-                validated_data.append(payload)
-            else:
-                logger.warning(f"Discarding invalid payload at index {index}")
-        return validated_data
+    def validate_tickers(self, symbols: List[str]) -> List[str]:
+        """Filter list of symbols to ensure they exist."""
+        valid_list: List[str] = []
+        for symbol in symbols:
+            if self.fetch_price(symbol) is not None:
+                valid_list.append(symbol)
+        return valid_list
