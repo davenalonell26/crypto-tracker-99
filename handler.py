@@ -1,69 +1,40 @@
-import requests
-from typing import Dict, Any, Optional
-import time
+import logging
 
-class CryptoPriceHandler:
-    """Handler for fetching cryptocurrency prices."""
+def validate_ticker(ticker):
+    """Checks if ticker is a valid string and not empty."""
+    if not isinstance(ticker, str) or not ticker.isalnum() or len(ticker) > 5:
+        raise ValueError(f"Invalid ticker format: {ticker}")
+    return ticker.upper()
 
-    def __init__(self, base_url: str = "https://api.coingecko.com/api/v3") -> None:
-        """Initialize handler with API base URL.
+def validate_amount(amount):
+    """Ensures amount is a positive numeric value."""
+    try:
+        val = float(amount)
+        if val <= 0:
+            raise ValueError
+        return val
+    except (TypeError, ValueError):
+        raise ValueError(f"Invalid amount: {amount}")
 
-        Args:
-            base_url: The API base URL.
-        """
-        self.base_url = base_url
+def run_processing_loop(data_queue):
+    """Main loop for processing crypto transactions."""
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger("crypto-tracker-99")
 
-    def fetch_price(self, coin_id: str, currency: str = "usd") -> Dict[str, Any]:
-        """Fetch price for a crypto coin.
-
-        Args:
-            coin_id: Coin identifier like 'bitcoin'.
-            currency: Currency like 'usd'.
-
-        Returns:
-            Price data from API.
-        """
-        url = f"{self.base_url}/simple/price"
-        params = {"ids": coin_id, "vs_currencies": currency}
-        response = requests.get(url, params=params)
-        response.raise_for_status()
-        return response.json()
-
-    def get_price_with_retry(self, coin_id: str, currency: str = "usd", max_retries: int = 3) -> Optional[Dict[str, Any]]:
-        """Fetch with retries.
-
-        Args:
-            coin_id: Coin ID.
-            currency: Target currency.
-            max_retries: Retry count.
-
-        Returns:
-            Data or None on failure.
-        """
-        for attempt in range(max_retries):
-            try:
-                return self.fetch_price(coin_id, currency)
-            except requests.exceptions.RequestException:
-                if attempt >= max_retries - 1:
-                    return None
-                time.sleep(1)
-        return None
-
-
-def process_prices(data: Dict[str, Any]) -> Dict[str, float]:
-    """Process API data to extract prices.
-
-    Args:
-        data: Raw response data.
-
-    Returns:
-        Processed prices dict.
-    """
-    processed: Dict[str, float] = {}
-    for coin, info in data.items():
-        if isinstance(info, dict):
-            for price in info.values():
-                if isinstance(price, (int, float)):
-                    processed[coin] = float(price)
-                    break
-    return processed
+    while True:
+        task = data_queue.get()
+        if task is None:
+            break
+        
+        try:
+            # Input validation layer
+            ticker = validate_ticker(task.get('ticker'))
+            amount = validate_amount(task.get('amount'))
+            
+            # Processing logic
+            logger.info(f"Processing {amount} units of {ticker}")
+            
+        except ValueError as e:
+            logger.error(f"Validation failed: {e}")
+        except Exception as e:
+            logger.exception(f"Unexpected error: {e}")
