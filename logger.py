@@ -1,47 +1,38 @@
-import os
 import logging
+import os
 from logging.handlers import RotatingFileHandler
 
-
-def setup_logger(
-    name: str = "crypto_tracker",
-    log_file: str = "logs/crypto_tracker.log",
-    level: int = logging.INFO,
-    max_bytes: int = 5 * 1024 * 1024,
-    backup_count: int = 5,
-) -> logging.Logger:
-    """Configures a logger with stream and rotating file handlers for tracking events."""
+def setup_logger(name: str = 'crypto-tracker-99') -> logging.Logger:
+    """Configures a rotating file logger for crypto tracking operations."""
     logger = logging.getLogger(name)
-    logger.setLevel(level)
+    logger.setLevel(logging.INFO)
 
-    if logger.handlers:
-        return logger
+    # Ensure logs directory exists
+    log_dir = 'logs'
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
 
-    log_dir = os.path.dirname(log_file)
-    if log_dir:
-        os.makedirs(log_dir, exist_ok=True)
-
-    log_format = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-    date_format = "%Y-%m-%d %H:%M:%S"
-    formatter = logging.Formatter(fmt=log_format, datefmt=date_format)
-
-    # Stream handler for stdout output
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
-
-    # Rotating file handler to prevent log size explosion during heavy price streaming
-    file_handler = RotatingFileHandler(
-        filename=log_file,
-        maxBytes=max_bytes,
-        backupCount=backup_count,
-        encoding="utf-8",
+    # Rotation settings: 5MB per file, keep 3 backups
+    log_file = os.path.join(log_dir, 'app.log')
+    handler = RotatingFileHandler(
+        log_file, 
+        maxBytes=5*1024*1024, 
+        backupCount=3
     )
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
+
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    handler.setFormatter(formatter)
+
+    if not logger.handlers:
+        logger.addHandler(handler)
+        # Also output to console for development visibility
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
 
     return logger
 
-
-# Main logger instance used across crypto tracking modules
-logger = setup_logger()
+# Instance for global application usage
+tracker_logger = setup_logger()
