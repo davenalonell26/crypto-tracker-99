@@ -1,28 +1,33 @@
-import time
-import logging
-import functools
-from typing import Callable, Any
+from typing import Dict, List, Union
 
-# Configure logger for tracking
-logger = logging.getLogger('crypto-tracker-99')
+def calculate_price_change(open_price: float, current_price: float) -> float:
+    """
+    Calculates the percentage change between open and current price.
+    Returns 0.0 if open price is invalid or zero.
+    """
+    if open_price <= 0:
+        return 0.0
+    return ((current_price - open_price) / open_price) * 100.0
 
-def retry_on_failure(retries: int = 3, delay: float = 2.0, backoff: float = 1.5):
-    """Decorator for retrying network operations with exponential backoff."""
-    def decorator(func: Callable):
-        @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            current_delay = delay
-            for attempt in range(retries):
-                try:
-                    return func(*args, **kwargs)
-                except Exception as e:
-                    if attempt == retries - 1:
-                        logger.error(f'Operation failed after {retries} attempts: {e}')
-                        raise
-                    
-                    logger.warning(f'Attempt {attempt + 1} failed, retrying in {current_delay}s...')
-                    time.sleep(current_delay)
-                    current_delay *= backoff
-            return None
-        return wrapper
-    return decorator
+def format_crypto_price(price: float) -> str:
+    """
+    Formats a crypto price to a readable string.
+    Uses more decimal places for sub-dollar assets.
+    """
+    if price >= 1.0:
+        return f"${price:,.2f}"
+    if price > 0.0:
+        return f"${price:,.6f}"
+    return "$0.00"
+
+def extract_ticker_symbols(raw_data: List[Dict[str, Union[str, float]]]) -> List[str]:
+    """
+    Extracts and standardizes ticker symbols from raw API payload.
+    Converts all tickers to uppercase and removes duplicates.
+    """
+    tickers = set()
+    for item in raw_data:
+        symbol = item.get("symbol") or item.get("ticker")
+        if isinstance(symbol, str):
+            tickers.add(symbol.upper().strip())
+    return sorted(list(tickers))
