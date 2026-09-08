@@ -1,76 +1,51 @@
 import os
 from typing import List
-from dataclasses import dataclass, field
 
 
-@dataclass
 class Config:
-    '''Configuration settings for the crypto-tracker-99 application.
+    """Application configuration for crypto-tracker-99.
 
-    This class holds all necessary parameters for interacting with
-    cryptocurrency APIs and managing tracking behavior.
-    '''
-    api_key: str = field(default_factory=lambda: os.getenv('CRYPTO_API_KEY', ''))
-    base_url: str = field(default='https://api.coingecko.com/api/v3')
-    tracked_cryptos: List[str] = field(default_factory=lambda: ['bitcoin', 'ethereum', 'solana'])
-    update_interval: int = field(default=60)
-    max_retries: int = field(default=3)
-    request_timeout: int = field(default=10)
-    enable_cache: bool = field(default=True)
-    cache_ttl: int = field(default=300)
+    Handles environment variables and provides sensible defaults
+    for tracking cryptocurrencies.
+    """
 
-
-def load_config() -> Config:
-    '''Load configuration from environment variables.
-
-    Overrides default values with environment variables if set.
-    Environment variables:
-    - CRYPTO_API_KEY: API key for crypto data provider
-    - TRACKED_CRYPTOS: Comma-separated list of crypto ids
-    - UPDATE_INTERVAL: Seconds between updates
-
-    Returns:
-        Config: Initialized configuration instance with type annotations.
-    '''
-    tracked = os.getenv('TRACKED_CRYPTOS', 'bitcoin,ethereum,solana')
-    return Config(
-        api_key=os.getenv('CRYPTO_API_KEY', ''),
-        base_url=os.getenv('CRYPTO_BASE_URL', 'https://api.coingecko.com/api/v3'),
-        tracked_cryptos=tracked.split(',') if tracked else [],
-        update_interval=int(os.getenv('UPDATE_INTERVAL', '60')),
-        max_retries=int(os.getenv('MAX_RETRIES', '3')),
-        request_timeout=int(os.getenv('REQUEST_TIMEOUT', '10')),
-        enable_cache=os.getenv('ENABLE_CACHE', 'true').lower() == 'true',
-        cache_ttl=int(os.getenv('CACHE_TTL', '300')),
+    # Coingecko API configuration
+    API_BASE_URL: str = os.getenv(
+        "CRYPTO_API_URL", "https://api.coingecko.com/api/v3"
     )
+    API_KEY: str = os.getenv("CRYPTO_API_KEY", "")
 
+    # Default coins to track if none provided
+    DEFAULT_COINS: List[str] = [
+        "bitcoin",
+        "ethereum",
+        "solana",
+        "cardano",
+        "ripple",
+    ]
 
-def get_api_endpoint(config: Config, path: str) -> str:
-    '''Build complete API URL using config base and provided path.
+    # Tracking settings
+    UPDATE_INTERVAL_SEC: int = int(os.getenv("UPDATE_INTERVAL_SEC", "60"))
+    FIAT_CURRENCY: str = os.getenv("FIAT_CURRENCY", "usd")
 
-    Args:
-        config: Application configuration object.
-        path: Relative API path without leading slash.
+    # Logging configuration
+    LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
 
-    Returns:
-        str: Fully qualified API endpoint URL.
-    '''
-    if not path.startswith('/'):
-        path = '/' + path
-    return f'{config.base_url}{path}'
+    @classmethod
+    def get_tracked_coins(cls) -> List[str]:
+        """Parse and return the list of coins to track from environment."""
+        coins_env = os.getenv("TRACKED_COINS")
+        if coins_env:
+            return [coin.strip().lower() for coin in coins_env.split(",")]
+        return cls.DEFAULT_COINS
 
-
-def is_config_valid(config: Config) -> bool:
-    '''Check if the loaded config meets basic requirements.
-
-    Args:
-        config: The config to validate.
-
-    Returns:
-        bool: Whether the configuration is valid for use.
-    '''
-    if not config.tracked_cryptos:
-        return False
-    if config.update_interval < 30:
-        return False
-    return True
+    @classmethod
+    def as_dict(cls) -> dict:
+        """Return config settings as a dictionary for logging or debugging."""
+        return {
+            "api_base_url": cls.API_BASE_URL,
+            "tracked_coins": cls.get_tracked_coins(),
+            "update_interval": cls.UPDATE_INTERVAL_SEC,
+            "fiat_currency": cls.FIAT_CURRENCY,
+            "log_level": cls.LOG_LEVEL,
+        }
