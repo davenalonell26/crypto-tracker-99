@@ -1,33 +1,33 @@
-from typing import Dict, List, Union
+import time
+import functools
+import logging
+from typing import Callable, Any
 
-def calculate_price_change(open_price: float, current_price: float) -> float:
-    """
-    Calculates the percentage change between open and current price.
-    Returns 0.0 if open price is invalid or zero.
-    """
-    if open_price <= 0:
-        return 0.0
-    return ((current_price - open_price) / open_price) * 100.0
+# crypto-tracker-99 network resilience utilities
+
+logger = logging.getLogger(__name__)
+
+def retry_request(max_retries: int = 3, delay: float = 1.5):
+    """Decorator for retrying network operations on failure."""
+    def decorator(func: Callable):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs) -> Any:
+            last_exception = None
+            for attempt in range(max_retries):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    last_exception = e
+                    logger.warning(
+                        f"Attempt {attempt + 1} failed for {func.__name__}: {e}"
+                    )
+                    if attempt < max_retries - 1:
+                        time.sleep(delay * (2 ** attempt))
+            logger.error(f"Final attempt failed for {func.__name__}")
+            raise last_exception
+        return wrapper
+    return decorator
 
 def format_crypto_price(price: float) -> str:
-    """
-    Formats a crypto price to a readable string.
-    Uses more decimal places for sub-dollar assets.
-    """
-    if price >= 1.0:
-        return f"${price:,.2f}"
-    if price > 0.0:
-        return f"${price:,.6f}"
-    return "$0.00"
-
-def extract_ticker_symbols(raw_data: List[Dict[str, Union[str, float]]]) -> List[str]:
-    """
-    Extracts and standardizes ticker symbols from raw API payload.
-    Converts all tickers to uppercase and removes duplicates.
-    """
-    tickers = set()
-    for item in raw_data:
-        symbol = item.get("symbol") or item.get("ticker")
-        if isinstance(symbol, str):
-            tickers.add(symbol.upper().strip())
-    return sorted(list(tickers))
+    """Helper for normalizing price data strings."""
+    return f"${price:,.2f}"
