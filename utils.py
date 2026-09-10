@@ -1,33 +1,34 @@
 import time
 import functools
-import logging
+import requests
 from typing import Callable, Any
 
-# crypto-tracker-99 network resilience utilities
-
-logger = logging.getLogger(__name__)
-
-def retry_request(max_retries: int = 3, delay: float = 1.5):
-    """Decorator for retrying network operations on failure."""
+def retry_request(max_retries: int = 3, backoff: float = 2.0):
+    """Decorator for retrying network operations with exponential backoff."""
     def decorator(func: Callable):
         @functools.wraps(func)
         def wrapper(*args, **kwargs) -> Any:
             last_exception = None
+            current_delay = backoff
+            
             for attempt in range(max_retries):
                 try:
                     return func(*args, **kwargs)
-                except Exception as e:
+                except (requests.exceptions.RequestException, ConnectionError) as e:
                     last_exception = e
-                    logger.warning(
-                        f"Attempt {attempt + 1} failed for {func.__name__}: {e}"
-                    )
                     if attempt < max_retries - 1:
-                        time.sleep(delay * (2 ** attempt))
-            logger.error(f"Final attempt failed for {func.__name__}")
+                        time.sleep(current_delay)
+                        current_delay *= 2
+                    continue
+            
             raise last_exception
         return wrapper
     return decorator
 
-def format_crypto_price(price: float) -> str:
-    """Helper for normalizing price data strings."""
-    return f"${price:,.2f}"
+@retry_request(max_retries=3)
+def fetch_crypto_price(symbol: str) -> dict:
+    """Example usage for fetching crypto market data."""
+    url = f"https://api.exchange.com/v1/ticker/{symbol}"
+    response = requests.get(url, timeout=10)
+    response.raise_for_status()
+    return response.json()
