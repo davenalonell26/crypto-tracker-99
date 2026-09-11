@@ -1,30 +1,46 @@
-from typing import Dict, List, Optional
+import requests
+from typing import Optional
+
+class CryptoFetchError(Exception):
+    """Custom exception for cryptocurrency data retrieval errors."""
+    pass
 
 class CryptoTracker:
-    """Core engine for tracking cryptocurrency price data."""
+    def __init__(self, base_url: str = "https://api.coingecko.com/api/v3", timeout: int = 10):
+        self.base_url = base_url
+        self.timeout = timeout
 
-    def __init__(self, symbols: List[str]) -> None:
-        self.symbols: List[str] = symbols
-        self.data: Dict[str, float] = {}
+    def fetch_price(self, coin_id: str, vs_currency: str = "usd") -> Optional[float]:
+        """Fetch current price for a coin with robust edge case error handling."""
+        if not coin_id or not isinstance(coin_id, str):
+            raise ValueError("Invalid coin_id provided")
 
-    def update_price(self, symbol: str, price: float) -> None:
-        """Updates internal price cache for a given symbol."""
-        if symbol in self.symbols:
-            self.data[symbol] = price
+        clean_coin = coin_id.lower().strip()
+        clean_currency = vs_currency.lower().strip()
+        url = f"{self.base_url}/simple/price"
+        params = {"ids": clean_coin, "vs_currencies": clean_currency}
 
-    def get_price(self, symbol: str) -> Optional[float]:
-        """Retrieves the cached price for a specific asset."""
-        return self.data.get(symbol)
+        try:
+            response = requests.get(url, params=params, timeout=self.timeout)
+            response.raise_for_status()
+            data = response.json()
 
-    def get_summary(self) -> Dict[str, float]:
-        """Returns the current state of tracked assets."""
-        return self.data.copy()
+            if not isinstance(data, dict) or clean_coin not in data:
+                raise CryptoFetchError(f"Coin '{clean_coin}' not found in response")
 
-    def calculate_portfolio_value(self, holdings: Dict[str, float]) -> float:
-        """Calculates total value based on provided holdings dictionary."""
-        total: float = 0.0
-        for symbol, amount in holdings.items():
-            price = self.get_price(symbol)
-            if price:
-                total += price * amount
-        return total
+            price_data = data[clean_coin]
+            if clean_currency not in price_data:
+                raise CryptoFetchError(f"Currency '{clean_currency}' not available for '{clean_coin}'")
+
+            price = price_data[clean_currency]
+            if not isinstance(price, (int, float)) or price < 0:
+                raise CryptoFetchError(f"Invalid price value received: {price}")
+
+            return float(price)
+
+        except requests.exceptions.Timeout:
+            raise CryptoFetchError(f"Request timed out while fetching price for {clean_coin}")
+        except requests.exceptions.RequestException as e:
+            raise CryptoFetchError(f"Network error occurred: {str(e)}")
+        except (ValueError, KeyError) as e:
+            raise CryptoFetchError(f"Failed to parse API response: {str(e)}")
