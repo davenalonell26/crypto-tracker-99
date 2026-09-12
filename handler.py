@@ -1,40 +1,33 @@
-import logging
+import functools
+import time
+from typing import Dict, Any
 
-def validate_ticker(ticker):
-    """Checks if ticker is a valid string and not empty."""
-    if not isinstance(ticker, str) or not ticker.isalnum() or len(ticker) > 5:
-        raise ValueError(f"Invalid ticker format: {ticker}")
-    return ticker.upper()
+# Cache crypto price lookup results for 30 seconds to minimize API calls
+_price_cache: Dict[str, tuple[float, float]] = {}
+CACHE_TTL = 30
 
-def validate_amount(amount):
-    """Ensures amount is a positive numeric value."""
-    try:
-        val = float(amount)
-        if val <= 0:
-            raise ValueError
-        return val
-    except (TypeError, ValueError):
-        raise ValueError(f"Invalid amount: {amount}")
+@functools.lru_cache(maxsize=128)
+def get_normalized_ticker(ticker: str) -> str:
+    return ticker.strip().upper()
 
-def run_processing_loop(data_queue):
-    """Main loop for processing crypto transactions."""
-    logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger("crypto-tracker-99")
+def get_cached_price(symbol: str, fetch_func: callable) -> float:
+    """Retrieves price with short-term memoization."""
+    normalized = get_normalized_ticker(symbol)
+    now = time.time()
+    
+    if normalized in _price_cache:
+        timestamp, price = _price_cache[normalized]
+        if now - timestamp < CACHE_TTL:
+            return price
 
-    while True:
-        task = data_queue.get()
-        if task is None:
-            break
-        
-        try:
-            # Input validation layer
-            ticker = validate_ticker(task.get('ticker'))
-            amount = validate_amount(task.get('amount'))
-            
-            # Processing logic
-            logger.info(f"Processing {amount} units of {ticker}")
-            
-        except ValueError as e:
-            logger.error(f"Validation failed: {e}")
-        except Exception as e:
-            logger.exception(f"Unexpected error: {e}")
+    # Fetch fresh data if expired or missing
+    new_price = fetch_func(normalized)
+    _price_cache[normalized] = (now, new_price)
+    return new_price
+
+def batch_process_prices(tickers: list, fetch_func: callable) -> Dict[str, float]:
+    """Optimized batch fetcher reducing redundant network I/O."""
+    results = {}
+    for ticker in tickers:
+        results[ticker] = get_cached_price(ticker, fetch_func)
+    return results
