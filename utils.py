@@ -1,34 +1,26 @@
-import time
-import functools
-import requests
-from typing import Callable, Any
+import decimal
+from typing import Union
 
-def retry_request(max_retries: int = 3, backoff: float = 2.0):
-    """Decorator for retrying network operations with exponential backoff."""
-    def decorator(func: Callable):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs) -> Any:
-            last_exception = None
-            current_delay = backoff
-            
-            for attempt in range(max_retries):
-                try:
-                    return func(*args, **kwargs)
-                except (requests.exceptions.RequestException, ConnectionError) as e:
-                    last_exception = e
-                    if attempt < max_retries - 1:
-                        time.sleep(current_delay)
-                        current_delay *= 2
-                    continue
-            
-            raise last_exception
-        return wrapper
-    return decorator
+def format_currency(value: Union[float, str, decimal.Decimal], precision: int = 8) -> str:
+    """Formats crypto values to strings with defined precision."""
+    val = decimal.Decimal(str(value))
+    format_str = f"0.{'0' * precision}"
+    return format(val.quantize(decimal.Decimal(format_str), rounding=decimal.ROUND_DOWN))
 
-@retry_request(max_retries=3)
-def fetch_crypto_price(symbol: str) -> dict:
-    """Example usage for fetching crypto market data."""
-    url = f"https://api.exchange.com/v1/ticker/{symbol}"
-    response = requests.get(url, timeout=10)
-    response.raise_for_status()
-    return response.json()
+def calculate_percentage_change(old: float, new: float) -> float:
+    """Calculates percentage change between two price points."""
+    if old == 0:
+        return 0.0
+    return ((new - old) / abs(old)) * 100
+
+def sanitize_symbol(symbol: str) -> str:
+    """Normalizes crypto symbols to uppercase format."""
+    return symbol.strip().upper()
+
+def get_market_cap_tier(market_cap: float) -> str:
+    """Categorizes market cap into simple tiers."""
+    if market_cap > 1_000_000_000:
+        return "large-cap"
+    elif market_cap > 100_000_000:
+        return "mid-cap"
+    return "small-cap"
